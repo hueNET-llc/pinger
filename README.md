@@ -1,5 +1,7 @@
-# pinger-icmp #
-A tool to log ICMP latency to targets in ClickHouse
+# pinger #
+A tool to measure target latency
+
+Log Levels: 10/debug, 20/info, 30/warning, 40/error
 
 ### Requirements ###
 ```
@@ -7,9 +9,13 @@ fping - ICMP targets
 ```
 
 ## Environment Variables ##
+A sample env can be found in `examples/example.env`
+
 ```
-LOG_LEVEL   -   Logging verbosity (default: "20")
-Log Levels  -   10/debug, 20/info, 30/warning, 40/error
+--- Pinger ---
+DATA_QUEUE_LIMIT    -   Max number of data waiting to be inserted into ClickHouse at once (default: "50")
+ICMP_INTERVAL       -   How long to wait in between ICMP measurements (default: "0")
+LOG_LEVEL           -   Logging verbosity (default: "20")
 
 --- Host Info ---
 HOST_COUNTRY    -   The host machine's country (e.g. "US")
@@ -33,7 +39,7 @@ CLICKHOUSE_TABLE    -   The ClickHouse table to insert data into (default: "ping
 ## Targets ##
 Target configuration is done via JSON in `targets.json`
 
-A sample configuration can be found in `examples/targets.json`
+A sample configuration can be found in `examples/targets-example.json`
 
 The file layout is as follows:
 ```
