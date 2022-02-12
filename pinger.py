@@ -230,57 +230,60 @@ class Pinger:
 
             # Parse fping output
             for result in output:
-                # Separate the IP from the latency readings
-                target, results = result.split(' : ')
-                # Separate the latency readings
-                results = results.split(' ')
-                # Convert valid latency readings to floats
-                timings = [float(r) for r in results if r != '-']
-                # Get the target info
-                target = self.icmp_targets[target.strip()]
+                try:
+                    # Separate the IP from the latency readings
+                    target, results = result.split(' : ')
+                    # Separate the latency readings
+                    results = results.split(' ')
+                    # Convert valid latency readings to floats
+                    timings = [float(r) for r in results if r != '-']
+                    # Get the target info
+                    target = self.icmp_targets[target.strip()]
 
-                # Check if there were any readings
-                if timings:
-                    data.append((
-                        'icmp',
-                        self.host_country, # host country
-                        self.host_state, # host state
-                        self.host_city, # host city 
-                        self.host_name, # host name
-                        self.host_asn, # host ASN
-                        target['name'], # target name
-                        target['country'], # target country
-                        target['state'], # target state
-                        target['city'], # target city
-                        target['asn'], # target ASN
-                        target['ip'], # target IP
-                        sum(timings) / len(timings), # avg ms
-                        max(timings), # max ms
-                        min(timings), # min ms
-                        (len([r for r in results if r == '-']) / len(results)) * 100, # loss percent
-                        timestamp
-                    ))
-                else:
-                    # No readings, probably 100% packet loss
-                    data.append((
-                        'icmp',
-                        self.host_country, # host country
-                        self.host_state, # host state
-                        self.host_city, # host city 
-                        self.host_name, # host name
-                        self.host_asn, # host ASN
-                        target['name'], # target name
-                        target['country'], # target country
-                        target['state'], # target state
-                        target['city'], # target city
-                        target['asn'], # target ASN
-                        target['ip'], # target IP
-                        None, # avg ms
-                        None, # max ms
-                        None, # min ms
-                        (len([r for r in results if r == '-']) / len(results)) * 100, # loss percent
-                        timestamp
-                    ))
+                    # Check if there were any readings
+                    if timings:
+                        data.append((
+                            'icmp',
+                            self.host_country, # host country
+                            self.host_state, # host state
+                            self.host_city, # host city 
+                            self.host_name, # host name
+                            self.host_asn, # host ASN
+                            target['name'], # target name
+                            target['country'], # target country
+                            target['state'], # target state
+                            target['city'], # target city
+                            target['asn'], # target ASN
+                            target['ip'], # target IP
+                            sum(timings) / len(timings), # avg ms
+                            max(timings), # max ms
+                            min(timings), # min ms
+                            (len([r for r in results if r == '-']) / len(results)) * 100, # loss percent
+                            timestamp
+                        ))
+                    else:
+                        # No readings, probably 100% packet loss
+                        data.append((
+                            'icmp',
+                            self.host_country, # host country
+                            self.host_state, # host state
+                            self.host_city, # host city 
+                            self.host_name, # host name
+                            self.host_asn, # host ASN
+                            target['name'], # target name
+                            target['country'], # target country
+                            target['state'], # target state
+                            target['city'], # target city
+                            target['asn'], # target ASN
+                            target['ip'], # target IP
+                            None, # avg ms
+                            None, # max ms
+                            None, # min ms
+                            (len([r for r in results if r == '-']) / len(results)) * 100, # loss percent
+                            timestamp
+                        ))
+                except Exception:
+                    log.exception('Failed to parse fping result')
 
             # Put the data into the data queue
             try:
@@ -288,6 +291,7 @@ class Pinger:
             except asyncio.QueueFull:
                 # Ignore and continue if the queue is full
                 # (ClickHouse is probably down/overloaded)
+                log.warning(f'Failed to queue timestamp icmp/{timestamp} for insertion, insert queue is full')
                 pass
 
             # Wait the interval before running again
