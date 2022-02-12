@@ -323,5 +323,5 @@ class Pinger:
         await asyncio.Event().wait()
 
 
-loop = asyncio.new_event_loop()
+loop = asyncio.get_event_loop()
 loop.run_until_complete(Pinger(loop).run())
