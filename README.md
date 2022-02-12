@@ -1,15 +1,16 @@
 # pinger #
 A tool to measure target latency
 
-Log Levels: 10/debug, 20/info, 30/warning, 40/error
-
 ### Requirements ###
 ```
-fping - ICMP targets
+ClickHouse  -   (fast) Metrics storage
+fping       -   Measuring ICMP targets
 ```
 
 ## Environment Variables ##
 A sample env can be found in `examples/example.env`
+
+Log Levels: 10/debug, 20/info, 30/warning, 40/error
 
 ```
 --- Pinger ---
