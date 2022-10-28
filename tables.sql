@@ -20,7 +20,7 @@ CREATE TABLE pinger (
     min_ms Nullable(Float),
     loss_percent Float,
     time DateTime DEFAULT now()
-) ENGINE = MergeTree() PARTITION BY toDate(time) ORDER BY (host_country, host_state, host_city, host_name, time) PRIMARY KEY (host_country, host_state, host_city, host_name, time);
+) ENGINE = MergeTree() PARTITION BY toDate(time) ORDER BY (host_name, target_name, time) PRIMARY KEY (host_name, target_name, time);
 
 CREATE TABLE pinger_buffer (
     type LowCardinality(String),
