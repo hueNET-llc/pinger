@@ -1,12 +1,12 @@
-name: Master - Build and push to Docker Hub
+name: Other - Build only
 
 on:
   workflow_dispatch:
     branches:
-      - 'master'
+      - 'dev-x86'
   push:
     branches:
-      - 'master'
+      - 'dev-x86'
 
 jobs:
   build:
@@ -21,13 +21,12 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Build and push for AMD64/ARM64
+      - name: Build and push for x86
         uses: docker/build-push-action@v2
         with:
           context: .
           file: ./Dockerfile
           platforms:
-            - 'linux/amd64'
-            - 'linux/arm64'
+            - 'linux/x86'
           push: true
-          tags: ${{ secrets.DOCKER_USER }}/pinger:latest
+          tags: ${{ secrets.DOCKER_USER }}/pinger:x86
