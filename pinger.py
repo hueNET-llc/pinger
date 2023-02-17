@@ -6,6 +6,7 @@ import datetime
 import json
 import logging
 import os
+import signal
 import sys
 
 log = logging.getLogger('Pinger')
@@ -54,6 +55,9 @@ class Pinger:
 
         # Queue of data waiting to be inserted into ClickHouse
         self.data_queue = asyncio.Queue(maxsize=self.data_queue_limit)
+
+        # Event used to stop the loop
+        self.stop_event = asyncio.Event()
 
     def setup_logging(self):
         """
@@ -323,9 +327,27 @@ class Pinger:
         if self.icmp_targets:
             asyncio.create_task(self.measure_icmp())
 
-        # Run forever
-        await asyncio.Event().wait()
+        # Run forever or until we get SIGTERM'd
+        await self.stop_event.wait()
+
+        log.info('Exiting...')
+        # Close the ClientSession
+        await self.session.close()
+        # Close the ClickHouse client
+        await self.clickhouse.close()
 
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(Pinger(loop).run())
+if __name__ == '__main__':
+    loop = asyncio.new_event_loop()
+    pinger = Pinger(loop)
+
+    def sigterm_handler(_signo, _stack_frame):
+        """
+            Handle SIGTERM
+        """
+        # Set the event to stop the loop
+        pinger.stop_event.set()
+    # Register the SIGTERM handler
+    signal.signal(signal.SIGTERM, sigterm_handler)
+
+    loop.run_until_complete(pinger.run())
