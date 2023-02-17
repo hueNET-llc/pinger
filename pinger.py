@@ -101,6 +101,12 @@ class Pinger:
             log.exception('Invalid DATA_QUEUE_LIMIT passed, must be a number')
             exit(1)
 
+        try:
+            self.host_name = os.environ['HOST_NAME']
+        except KeyError:
+            log.exception('Missing required env var HOST_NAME not set')
+            exit(1)
+
         # Set the logging level
         logging.root.setLevel(self.log_level)
 
@@ -149,8 +155,9 @@ class Pinger:
                     await self.clickhouse.execute(
                         f"""
                         INSERT INTO {self.clickhouse_table} (
-                            name, ip, avg_ms, max_ms, min_ms,
-                            loss_percent, time
+                            host_name, target_name, target_ip,
+                            avg_ms, max_ms, min_ms, loss_percent,
+                            time
                         ) VALUES
                         """,
                         *data
@@ -226,6 +233,7 @@ class Pinger:
                     # Check if there were any readings
                     if timings:
                         data.append((
+                            self.host_name,
                             target_name,
                             target_ip,
                             sum(timings) / len(timings), # avg ms
@@ -237,6 +245,7 @@ class Pinger:
                     else:
                         # No readings, probably 100% packet loss
                         data.append((
+                            self.host_name,
                             target_name,
                             target_ip,
                             None, # avg ms
