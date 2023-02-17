@@ -178,8 +178,8 @@ class Pinger:
             f'i{self.fping_min_interval}',       # minimum interval between pings to any target (in milliseconds)
         ]
         # Add target IPs to fping args
-        for target in self.targets.values():
-            fping_args.append(target['ip'])
+        for target in self.targets.keys():
+            fping_args.append(target)
 
         log.info(f'Running pinger with {len(self.targets)} target(s) ')
         log.debug(f'fping args: {fping_args}')
