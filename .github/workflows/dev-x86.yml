@@ -26,7 +26,6 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          platforms:
-            - 'linux/x86'
+          platforms: linux/amd64
           push: true
           tags: ${{ secrets.DOCKER_USER }}/pinger:x86
