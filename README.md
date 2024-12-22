@@ -1,42 +1,30 @@
 # pinger #
-A tool to measure target latency
+A tool to measure ICMP latency
 
 ### Requirements ###
-```
-ClickHouse  -   (fast) Metrics storage
-fping       -   Measuring ICMP targets
-```
+- ClickHouse - (fast) Metrics storage
+- fping - Measuring ICMP targets
 
 ## Environment Variables ##
 A sample env can be found in `examples/example.env`
 
 Log Levels: 10/debug, 20/info, 30/warning, 40/error
 
-```
---- Pinger ---
-DATA_QUEUE_LIMIT    -   Max number of data waiting to be inserted into ClickHouse at once (default: "50") (optional)
-ICMP_INTERVAL       -   How long to wait in between ICMP measurements (default: "0") (optional)
-LOG_LEVEL           -   Logging verbosity (default: "20") (optional)
-
---- Host Info ---
-HOST_COUNTRY    -   The host machine's country (e.g. "US") (optional)
-HOST_STATE      -   The host machine's state (e.g. "NJ") (optional)
-HOST_CITY       -   The host machine's city (e.g. "Newark") (optional)
-HOST_NAME       -   The host machine's name (e.g. "router") (required)
-
---- FPing Settings ---
-FPING_NUM_PINGS         -   Number of ICMP pings to send during each run (default": "5") (optional)
-FPING_BACKOFF_FACTOR    -   Retry backoff factor after failed pings (default: "1) (optional)
-FPING_RETRIES           -   How many times to retry a failed ping (default: "1") (optional)
-FPING_MIN_INTERVAL      -   Minimum interval in between pings in milliseconds (default: "100") (optional)
-
---- ClickHouse Login Info ---
-CLICKHOUSE_URL      -   The ClickHouse URL (e.g. "https://192.168.0.69:8123") (required)
-CLICKHOUSE_USER     -   The ClickHouse login username (required)
-CLICKHOUSE_PASS     -   The ClickHouse login password (required)
-CLICKHOUSE_DB       -   The ClickHouse database (required)
-CLICKHOUSE_TABLE    -   The ClickHouse table to insert data into (default: "pinger") (optional)
-```
+|  Name  | Description | Type | Default | Example |
+| ------ | ----------- | ---- | ------- | ------- |
+| HOST_NAME | Host name | str | N/A | router.nyc01 |
+| LOG_LEVEL | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) (optional) | str | INFO | INFO |
+| DATA_QUEUE_LIMIT | ClickHouse insert queue max length (optional) | int | 50 | 1000 |
+| ICMP_INTERVAL| Wait time in between ICMP measurements in seconds (optional) | int | 0 | 10 |
+| FPING_NUM_PINGS | Number of ICMP pings to send during each run (optional) | int | 5 | 10 |
+| FPING_BACKOFF_FACTOR | Retry backoff factor after failed pings (optional) | int | 1 | 15 |
+| FPING_RETRIES | Number of times to retry a failed ping (optional) | int | 1 | 5 |
+| FPING_MIN_INTERVAL | Minimum interval in between pings in milliseconds (optional) | int | 100 | 500 |
+| CLICKHOUSE_URL | ClickHouse URL | str | N/A | https://192.168.0.5:8123 |
+| CLICKHOUSE_USERNAME | ClickHouse username | str | N/A | pinger |
+| CLICKHOUSE_PASSWORD | ClickHouse password | str | N/A | hunter2 |
+| CLICKHOUSE_DATABASE | ClickHouse database | str | N/A | metrics |
+| CLICKHOUSE_TABLE | ClickHouse table (optional) | str | pinger | pinger |
 
 ## Targets ##
 Target configuration is done via JSON in `targets.json`
@@ -48,12 +36,7 @@ The file layout is as follows:
 {
     "targets": [
         {
-            "type": "icmp (other types coming soon)",
             "name": "target name",
-            "country": "target country (optional)",
-            "state": "target state (optional)",
-            "city": "target city (optional)",
-            "asn": "target asn (optional)",
             "ip": "target ip"
         }        
     ]

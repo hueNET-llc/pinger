@@ -41,8 +41,12 @@ class Pinger:
             except Exception:
                 log.exception(f'Failed to parse target {target}')
 
+        if not self.targets:
+            log.error('No valid targets found')
+            exit(1)
+
         # Queue of data waiting to be inserted into ClickHouse
-        self.data_queue = asyncio.Queue(maxsize=self.data_queue_limit)
+        self.clickhouse_queue = asyncio.Queue(maxsize=self.data_queue_limit)
 
         # Event used to stop the loop
         self.stop_event = asyncio.Event()
@@ -81,34 +85,37 @@ class Pinger:
         """
         # Max number of inserts waiting to be inserted at once
         try:
-            self.data_queue_limit = int(os.environ.get('DATA_QUEUE_LIMIT', 50))
+            self.data_queue_limit = max(int(os.environ.get('DATA_QUEUE_LIMIT', 50)), 1)
         except ValueError:
             log.exception('Invalid DATA_QUEUE_LIMIT passed, must be a number')
             exit(1)
 
         # How long to wait in between ICMP measurements
         try:
-            self.target_interval = int(os.environ.get('target_interval', 0))
+            self.icmp_interval = max(int(os.environ.get('ICMP_INTERVAL', 0)), 0)
         except ValueError:
-            log.exception('Invalid target_interval passed, must be a number')
+            log.exception('Invalid ICMP_INTERVAL passed, must be a number')
             exit(1)
 
         # Log level to use
-        # 10/debug  20/info  30/warning  40/error
+        # 10/debug, 20/info, 30/warning, 40/error, 50/critical
         try:
-            self.log_level = int(os.environ.get('LOG_LEVEL', 20))
+            log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+            if log_level not in ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'):
+                raise ValueError
         except ValueError:
-            log.exception('Invalid DATA_QUEUE_LIMIT passed, must be a number')
+            log.critical('Invalid LOG_LEVEL, must be a valid log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
             exit(1)
+
+        # Set the log level
+        log.setLevel({'DEBUG': logging.DEBUG, 'INFO': logging.INFO, 'WARNING': logging.WARNING, 'ERROR': logging.ERROR, 'CRITICAL': logging.CRITICAL}[log_level])
+
 
         try:
             self.host_name = os.environ['HOST_NAME']
         except KeyError:
             log.exception('Missing required env var HOST_NAME not set')
             exit(1)
-
-        # Set the logging level
-        logging.root.setLevel(self.log_level)
 
         # FPing info
         # Number of pings to send to each target during a run
@@ -134,9 +141,9 @@ class Pinger:
 
         # ClickHouse info
         self.clickhouse_url = os.environ['CLICKHOUSE_URL']
-        self.clickhouse_user = os.environ['CLICKHOUSE_USER']
-        self.clickhouse_pass = os.environ['CLICKHOUSE_PASS']
-        self.clickhouse_db = os.environ['CLICKHOUSE_DB']
+        self.clickhouse_username = os.environ['CLICKHOUSE_USERNAME']
+        self.clickhouse_password = os.environ['CLICKHOUSE_PASSWORD']
+        self.clickhouse_database = os.environ['CLICKHOUSE_DATABASE']
         self.clickhouse_table = os.environ.get('CLICKHOUSE_TABLE', 'pinger')
 
     async def insert_to_clickhouse(self):
@@ -145,7 +152,7 @@ class Pinger:
         """
         while True:
             # Get and check data from the queue
-            if not (data := await self.data_queue.get()):
+            if not (data := await self.clickhouse_queue.get()):
                 continue
 
             # Keep trying until the insert succeeds
@@ -171,18 +178,18 @@ class Pinger:
                     # Wait before retrying so we don't spam retries
                     await asyncio.sleep(2)
 
-    async def measure_targets(self):
+    async def ping_targets(self):
         """
            Measure ICMP targets
         """
         # Generate fping args
         fping_args = [
-            f'-C{self.fping_num_pings}',         # number of pings to send to target, displayed in automation-friendly format
-            '-q',                           # quiet, no per-probe msgs, only final summary, no icmp errors
-            f'-B{self.fping_backoff_factor}',    # backoff factor on failed ping
-            f'-r{self.fping_retries}',           # retry limit on failed ping (not including 1st try)
-            '-4',                           # force ipv4
-            f'i{self.fping_min_interval}',       # minimum interval between pings to any target (in milliseconds)
+            f'-C{self.fping_num_pings}',        # number of pings to send to target, displayed in automation-friendly format
+            '-q',                               # quiet, no per-probe msgs, only final summary, no icmp errors
+            f'-B{self.fping_backoff_factor}',   # backoff factor on failed ping
+            f'-r{self.fping_retries}',          # retry limit on failed ping (not including 1st try)
+            '-4',                               # force ipv4
+            f'i{self.fping_min_interval}',      # minimum interval between pings to any target (in milliseconds)
         ]
         # Add target IPs to fping args
         for target in self.targets.keys():
@@ -209,7 +216,7 @@ class Pinger:
                 log.exception('Failed to read fping output')
                 # Wait a few seconds before retrying so we don't spam
                 # in case of connectivity loss, etc.
-                await asyncio.sleep(self.target_interval or 2)
+                await asyncio.sleep(self.icmp_interval or 2)
                 continue
 
             # Data to be inserted to ClickHouse
@@ -222,7 +229,7 @@ class Pinger:
             for result in output:
                 try:
                     # Separate the IP from the latency readings
-                    target_ip, results = result.split(' : ')
+                    target_ip, results = result.split(' : ').strip()
                     # Separate the latency readings
                     results = results.split(' ')
                     # Convert valid latency readings to floats
@@ -259,15 +266,14 @@ class Pinger:
 
             # Put the data into the data queue
             try:
-                self.data_queue.put_nowait(data)
+                self.clickhouse_queue.put_nowait(data)
             except asyncio.QueueFull:
                 # Ignore and continue if the queue is full
                 # (ClickHouse is probably down/overloaded)
                 log.warning(f'Failed to queue timestamp {timestamp} for insertion, insert queue is full')
-                pass
 
             # Wait the interval before running again
-            await asyncio.sleep(self.target_interval)
+            await asyncio.sleep(self.icmp_interval)
 
     async def run(self):
         """
@@ -281,9 +287,9 @@ class Pinger:
         self.clickhouse = aiochclient.ChClient(
             self.session,
             url=self.clickhouse_url,
-            user=self.clickhouse_user,
-            password=self.clickhouse_pass,
-            database=self.clickhouse_db,
+            user=self.clickhouse_username,
+            password=self.clickhouse_password,
+            database=self.clickhouse_database,
             json=json
         )
         log.debug(f'Using ClickHouse table "{self.clickhouse_table}" at "{self.clickhouse_url}"')
@@ -291,9 +297,8 @@ class Pinger:
         # Run the queue inserter as a task
         asyncio.create_task(self.insert_to_clickhouse())
 
-        # Check if there's any targets
-        if self.targets:
-            asyncio.create_task(self.measure_targets())
+        # Start pinging the targets
+        asyncio.create_task(self.ping_targets())
 
         # Run forever or until we get SIGTERM'd
         await self.stop_event.wait()

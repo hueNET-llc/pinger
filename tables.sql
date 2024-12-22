@@ -22,4 +22,4 @@ CREATE TABLE pinger_buffer (
     min_ms Nullable(Float),
     loss_percent Float,
     time DateTime DEFAULT now()
-) ENGINE = Buffer(homelab, pinger_targets, 1, 10, 10, 10, 100, 10000, 10000);
+) ENGINE = Buffer(homelab, pinger, 1, 10, 10, 10, 100, 10000, 10000);
