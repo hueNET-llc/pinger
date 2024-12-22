@@ -229,7 +229,9 @@ class Pinger:
             for result in output:
                 try:
                     # Separate the IP from the latency readings
-                    target_ip, results = result.split(' : ').strip()
+                    target_ip, results = result.strip().split(' : ')
+                    # Strip whitespace from the target IP
+                    target_ip = target_ip.strip()
                     # Separate the latency readings
                     results = results.split(' ')
                     # Convert valid latency readings to floats
