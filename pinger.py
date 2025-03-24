@@ -17,41 +17,20 @@ log = logging.getLogger('Pinger')
 class Pinger:
     def __init__(self, loop):
         # Setup logging
-        self.setup_logging()
+        self._setup_logging()
         # Load environment variables
-        self.load_env_vars()
-
+        self._load_env_vars()
         # Get the event loop
         self.loop = loop
-
+        # Load targets from targets.json
         self.targets = {}
-        # Open and read the targets file
-        with open('targets.json', 'r') as file:
-            try:
-                targets = json.loads(file.read())
-            except Exception as e:
-                log.error(f'Failed to read targets.json: "{e}"')
-                exit(1)
-
-        # Parse targets
-        for target in targets['targets']:
-            try:
-                self.targets[target['ip']] = target['name']
-                log.debug(f'Parsed target "{target["name"]}" with IP "{target["ip"]}"')
-            except Exception:
-                log.exception(f'Failed to parse target {target}')
-
-        if not self.targets:
-            log.error('No valid targets found')
-            exit(1)
-
+        self._load_targets()
         # Queue of data waiting to be inserted into ClickHouse
         self.clickhouse_queue = asyncio.Queue(maxsize=self.data_queue_limit)
-
         # Event used to stop the loop
         self.stop_event = asyncio.Event()
 
-    def setup_logging(self):
+    def _setup_logging(self):
         """
             Sets up logging colors and formatting
         """
@@ -79,7 +58,7 @@ class Pinger:
         logging.getLogger('Pinger').addHandler(shandler)
         log.debug('Finished setting up logging')
 
-    def load_env_vars(self):
+    def _load_env_vars(self):
         """
             Loads environment variables
         """
@@ -146,6 +125,32 @@ class Pinger:
         self.clickhouse_database = os.environ['CLICKHOUSE_DATABASE']
         self.clickhouse_table = os.environ.get('CLICKHOUSE_TABLE', 'pinger')
 
+    def _load_targets(self):
+        """
+            Loads targets from targets.json
+        """
+        with open('targets.json', 'r') as file:
+            try:
+                targets = json.loads(file.read())
+            except Exception as e:
+                log.error(f'Failed to load targets.json: "{e}"')
+                exit(1)
+
+        # Parse targets
+        for target in targets['targets']:
+            try:
+                self.targets[target['ip']] = [
+                    target['name'],
+                    target.get('location')
+                ]
+                log.debug(f'Parsed target "{target["name"]}" with IP "{target["ip"]}" and location "{target.get("location")}"')
+            except Exception as e:
+                log.error(f'Failed to parse target "{target}": "{e}"')
+
+        if not self.targets:
+            log.error('No valid targets found')
+            exit(1)
+
     async def insert_to_clickhouse(self):
         """
             Gets data from the data queue and inserts it into ClickHouse
@@ -162,7 +167,7 @@ class Pinger:
                     await self.clickhouse.execute(
                         f"""
                         INSERT INTO {self.clickhouse_table} (
-                            host_name, target_name, target_ip,
+                            host_name, target_name, target_location, target_ip,
                             avg_ms, max_ms, min_ms, loss_percent,
                             time
                         ) VALUES
@@ -180,7 +185,7 @@ class Pinger:
 
     async def ping_targets(self):
         """
-           Measure ICMP targets
+           Measure ICMP target latency
         """
         # Generate fping args
         fping_args = [
@@ -188,7 +193,7 @@ class Pinger:
             '-q',                               # quiet, no per-probe msgs, only final summary, no icmp errors
             f'-B{self.fping_backoff_factor}',   # backoff factor on failed ping
             f'-r{self.fping_retries}',          # retry limit on failed ping (not including 1st try)
-            '-4',                               # force ipv4
+            '-4',                               # force IPv4
             f'i{self.fping_min_interval}',      # minimum interval between pings to any target (in milliseconds)
         ]
         # Add target IPs to fping args
@@ -236,14 +241,17 @@ class Pinger:
                     results = results.split(' ')
                     # Convert valid latency readings to floats
                     timings = [float(r) for r in results if r != '-']
-                    # Get the target info
-                    target_name = self.targets[target_ip.strip()]
+                    # Target namne
+                    target_name = self.targets[target_ip.strip()][0]
+                    # Target location
+                    target_location = self.targets[target_ip.strip()][1]
 
                     # Check if there were any readings
                     if timings:
                         data.append((
                             self.host_name,
                             target_name,
+                            target_location,
                             target_ip,
                             sum(timings) / len(timings), # avg ms
                             max(timings), # max ms
@@ -256,6 +264,7 @@ class Pinger:
                         data.append((
                             self.host_name,
                             target_name,
+                            target_location,
                             target_ip,
                             None, # avg ms
                             None, # max ms

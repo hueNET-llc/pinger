@@ -1,27 +1,7 @@
 {
     "targets": [
-        {
-            "type": "icmp",
-            "name": "Cloudflare",
-            "country": "US",
-            "state": "NJ",
-            "city": "Newark",
-            "asn": 13335,
-            "ip": "1.1.1.1"
-        },
-        {
-            "type": "icmp",
-            "name": "Google",
-            "country": "US",
-            "state": "NJ",
-            "city": "Newark",
-            "asn": 15169,
-            "ip": "8.8.8.8"
-        },
-        {
-            "type": "icmp",
-            "name": "Amazon",
-            "ip": "amazon.com"
-        }
+        {"name": "Cloudflare (1.1.1.1)", "location": "Newark-NJ-US", "ip": "1.1.1.1"},
+        {"name": "Google (8.8.8.8)", "location": "Newark-NJ-US", "ip": "8.8.8.8"},
+        {"name": "Amazon", "ip": "amazon.com"}
     ]
 }

@@ -5,6 +5,7 @@
 CREATE TABLE pinger (
     host_name LowCardinality(String),
     target_name LowCardinality(String),
+    target_location LowCardinality(Nullable(String)),
     target_ip LowCardinality(String),
     avg_ms Nullable(Float),
     max_ms Nullable(Float),
@@ -16,6 +17,7 @@ CREATE TABLE pinger (
 CREATE TABLE pinger_buffer (
     host_name LowCardinality(String),
     target_name LowCardinality(String),
+    target_location LowCardinality(Nullable(String)),
     target_ip LowCardinality(String),
     avg_ms Nullable(Float),
     max_ms Nullable(Float),
